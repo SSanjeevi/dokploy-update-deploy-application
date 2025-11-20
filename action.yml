@@ -1,5 +1,5 @@
 name: 'Dokploy "Update and Deploy Application" Action for GitHub Actions'
-description: 'Update and deploy applications on Dokploy platform'
+description: 'Comprehensive Dokploy deployment automation with full lifecycle management'
 author: 'patrikjokhel'
 
 branding:
@@ -7,61 +7,284 @@ branding:
   color: 'blue'
 
 inputs:
+  # ===== Core Configuration (Required) =====
   dokploy-url:
-    description: 'The URL of your Dokploy instance'
+    description: 'The URL of your Dokploy instance (e.g., https://dokploy.example.com)'
     required: true
+  
   api-key:
     description: 'API key for authenticating with Dokploy'
     required: true
-  application-id:
-    description: 'ID of the application to deploy'
-    required: true
-  name:
-    description: 'Name of the application'
-    required: false
-  env:
-    description: 'Environment variables for the application in string format'
-    required: false
-  memory-reservation:
-    description: 'Memory reservation for the application'
-    required: false
-  memory-limit:
-    description: 'Memory limit for the application'
-    required: false
-  cpu-reservation:
-    description: 'CPU reservation for the application'
-    required: false
-  cpu-limit:
-    description: 'CPU limit for the application'
-    required: false
-  registry-url:
-    description: 'Docker registry URL'
-    required: false
-  registry-username:
-    description: 'Username for docker registry authentication'
-    required: false
-  registry-password:
-    description: 'Password for docker registry authentication'
-    required: false
+  
   docker-image:
-    description: 'Docker image to deploy'
+    description: 'Docker image to deploy (e.g., ghcr.io/user/app:v1.0.0)'
+    required: true
+  
+  # ===== Project & Environment Management =====
+  project-id:
+    description: 'Dokploy project ID (optional - will create/find project if not provided)'
     required: false
-  deployment-title:
-    description: 'Title for the deployment'
+  
+  project-name:
+    description: 'Project name (used for creation or lookup, e.g., "billing-staging-stg")'
     required: false
-  deployment-description:
-    description: 'Description for the deployment'
+  
+  project-description:
+    description: 'Project description (used when creating new project)'
     required: false
+    default: 'Automated deployment project'
+  
+  environment-id:
+    description: 'Environment ID (optional - will create/find environment if not provided)'
+    required: false
+  
+  environment-name:
+    description: 'Environment name (staging/production/development)'
+    required: false
+    default: 'production'
+  
+  auto-create-resources:
+    description: 'Auto-create project/environment if not found (true/false)'
+    required: false
+    default: 'true'
+  
+  # ===== Application Configuration =====
+  application-id:
+    description: 'ID of existing application (optional - will create if not provided)'
+    required: false
+  
+  application-name:
+    description: 'Application name (required if creating new application)'
+    required: false
+  
+  application-title:
+    description: 'Human-readable application title'
+    required: false
+  
+  application-description:
+    description: 'Application description'
+    required: false
+  
+  container-name:
+    description: 'Custom container name (appName in Dokploy, e.g., "v1-0-0-stg-api")'
+    required: false
+  
+  # ===== Server Configuration =====
+  server-id:
+    description: 'Server ID for deployment (alternative to server-name)'
+    required: false
+  
+  server-name:
+    description: 'Server name to deploy to (will lookup ID automatically, e.g., "Hostinger-Server1")'
+    required: false
+    default: 'Hostinger-Server1'
+  
+  # ===== Container Resources =====
+  memory-limit:
+    description: 'Memory limit in MB (number only, e.g., 1024)'
+    required: false
+    default: '512'
+  
+  memory-reservation:
+    description: 'Memory reservation in MB (number only, e.g., 256)'
+    required: false
+  
+  cpu-limit:
+    description: 'CPU limit in millicores (e.g., 500 for 0.5 CPU, or "500m" format)'
+    required: false
+    default: '500'
+  
+  cpu-reservation:
+    description: 'CPU reservation in millicores'
+    required: false
+  
+  port:
+    description: 'Internal container port'
+    required: false
+    default: '8080'
+  
+  target-port:
+    description: 'External exposed port'
+    required: false
+    default: '8080'
+  
+  restart-policy:
+    description: 'Container restart policy (always/unless-stopped/on-failure/no)'
+    required: false
+    default: 'unless-stopped'
+  
+  # ===== Scaling Configuration =====
   replicas:
     description: 'Number of replicas to run'
     required: false
-  rollback-active:
-    description: 'Whether to enable rollback functionality (true/false)'
+    default: '1'
+  
+  min-replicas:
+    description: 'Minimum replicas for auto-scaling'
     required: false
+  
+  max-replicas:
+    description: 'Maximum replicas for auto-scaling'
+    required: false
+  
+  enable-auto-scaling:
+    description: 'Enable auto-scaling (true/false)'
+    required: false
+    default: 'false'
+  
+  # ===== Docker Registry =====
+  registry-url:
+    description: 'Docker registry URL (e.g., ghcr.io, docker.io)'
+    required: false
+    default: 'ghcr.io'
+  
+  registry-username:
+    description: 'Username for docker registry authentication'
+    required: false
+  
+  registry-password:
+    description: 'Password/token for docker registry authentication'
+    required: false
+  
+  # ===== Environment Variables =====
+  env:
+    description: 'Environment variables (multiline string format: VAR1=value1\nVAR2=value2)'
+    required: false
+  
+  env-file:
+    description: 'Path to environment variables file (.env format)'
+    required: false
+  
+  env-from-json:
+    description: 'Environment variables as JSON object string (e.g., {"VAR1":"value1","VAR2":"value2"})'
+    required: false
+  
+  # ===== Domain & SSL Configuration =====
+  domain-host:
+    description: 'Domain host (e.g., api.example.com, leave empty to skip domain configuration)'
+    required: false
+  
+  domain-path:
+    description: 'Domain path prefix'
+    required: false
+    default: '/'
+  
+  domain-port:
+    description: 'Domain port (usually same as target-port)'
+    required: false
+  
+  domain-https:
+    description: 'Enable HTTPS (true/false)'
+    required: false
+    default: 'true'
+  
+  ssl-certificate-type:
+    description: 'SSL certificate type (letsencrypt/custom/none)'
+    required: false
+    default: 'letsencrypt'
+  
+  domain-strip-path:
+    description: 'Strip path prefix when forwarding requests (true/false)'
+    required: false
+    default: 'false'
+  
+  force-domain-recreation:
+    description: 'Force recreate domain configuration even if it exists (true/false)'
+    required: false
+    default: 'false'
+  
+  # ===== Deployment Control =====
+  deployment-title:
+    description: 'Title for the deployment'
+    required: false
+  
+  deployment-description:
+    description: 'Description for the deployment'
+    required: false
+  
+  rollback-active:
+    description: 'Enable rollback functionality (true/false)'
+    required: false
+    default: 'false'
+  
+  wait-for-deployment:
+    description: 'Wait for deployment to complete (true/false)'
+    required: false
+    default: 'true'
+  
+  deployment-timeout:
+    description: 'Deployment timeout in seconds'
+    required: false
+    default: '300'
+  
+  cleanup-old-containers:
+    description: 'Stop old containers before deployment (true/false)'
+    required: false
+    default: 'false'
+  
+  # ===== Health Check & Verification =====
+  health-check-enabled:
+    description: 'Enable health check verification after deployment (true/false)'
+    required: false
+    default: 'true'
+  
+  health-check-url:
+    description: 'Health check endpoint URL path (e.g., /health, /api/health)'
+    required: false
+    default: '/health'
+  
+  health-check-timeout:
+    description: 'Health check timeout in seconds'
+    required: false
+    default: '60'
+  
+  health-check-retries:
+    description: 'Number of health check retries'
+    required: false
+    default: '3'
+  
+  health-check-interval:
+    description: 'Interval between health check retries in seconds'
+    required: false
+    default: '10'
+  
+  # ===== Debug & Logging =====
+  debug-mode:
+    description: 'Enable debug logging (true/false)'
+    required: false
+    default: 'false'
+  
+  log-api-requests:
+    description: 'Log all API requests (true/false, requires debug-mode)'
+    required: false
+    default: 'false'
+  
+  log-api-responses:
+    description: 'Log all API responses (true/false, requires debug-mode)'
+    required: false
+    default: 'false'
 
 outputs:
   application-id:
     description: 'The ID of the deployed application'
+  
+  project-id:
+    description: 'The ID of the Dokploy project'
+  
+  environment-id:
+    description: 'The ID of the environment'
+  
+  server-id:
+    description: 'The ID of the deployment server'
+  
+  deployment-url:
+    description: 'The URL of the deployed application (if domain configured)'
+  
+  deployment-status:
+    description: 'The status of the deployment (success/failed/pending)'
+  
+  health-check-status:
+    description: 'Health check status (healthy/unhealthy/skipped)'
 
 runs:
   using: 'node20'
